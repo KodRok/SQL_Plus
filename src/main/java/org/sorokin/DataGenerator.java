@@ -6,21 +6,20 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.Random;
 
-public class DataGenerator
-{
-        private static final String DB_URL = "jdbc:postgresql://localhost:5432/postgres"; // <-- ИЗМЕНИТЬ!
-        private static final String DB_USER = "postgres";
-        private static final String DB_PASSWORD = "admin";
+public class DataGenerator {
+    private static final String DB_URL = "jdbc:postgresql://localhost:5432/postgres";
+    private static final String DB_USER = "postgres";
+    private static final String DB_PASSWORD = "admin";
 
-        private static final int NUM_CUSTOMERS = 1000;
-        private static final int NUM_PRODUCTS = 100;
-        private static final int DAYS_RANGE = 425;
-        private static final int BATCH_SIZE = 5000;
-        private static final int TOTAL_ORDERS = 40_000_000;
+    private static final int NUM_CUSTOMERS = 1000;
+    private static final int NUM_PRODUCTS = 100;
+    private static final int DAYS_RANGE = 425;
+    private static final int BATCH_SIZE = 5000;
+    private static final int TOTAL_ORDERS = 40_000_000;
 
-        private static final Random random = new Random();
+    private static final Random random = new Random();
 
-        public static void main(String[] args) {
+    public static void main(String[] args) {
         System.out.println("Запуск генерации. Цель: " + TOTAL_ORDERS + " заказов.");
         try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
             conn.setAutoCommit(false);
@@ -33,11 +32,11 @@ public class DataGenerator
             System.out.println("Общее время: " + (endTime - startTime) / 1000.0 + " секунд.");
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            System.err.println("Ошибка при работе с базой данных: " + e.getMessage());
         }
     }
 
-        private static void insertInitialData(Connection conn) throws SQLException {
+    private static void insertInitialData(Connection conn) throws SQLException {
         String sqlProducts = "INSERT INTO sql_plus_project.products (name, price) " +
                 "SELECT 'Product_' || generate_series(1, 100), (random() * 1000 + 1)::NUMERIC(10, 2)";
         try (PreparedStatement pstmt = conn.prepareStatement(sqlProducts)) {
@@ -51,11 +50,14 @@ public class DataGenerator
         try (PreparedStatement pstmt = conn.prepareStatement(sqlCustomers)) {
             pstmt.executeUpdate();
             System.out.println("Вставлено 1000 клиентов.");
+            conn.commit();
+        } catch (SQLException e) {
+            conn.rollback();
+            throw new SQLException("Ошибка при вставке начальных данных", e);
         }
-        conn.commit();
     }
 
-        private static void insertOrders(Connection conn) throws SQLException {
+    private static void insertOrders(Connection conn) throws SQLException {
         String insertSQL = "INSERT INTO sql_plus_project.orders " +
                 "(customer_id, product_id, created_at, quantity, amount, status)" +
                 " VALUES (?, ?, ?, ?, ?, ?)";
@@ -88,6 +90,13 @@ public class DataGenerator
 
             pstmt.executeBatch();
             conn.commit();
+        } catch (SQLException e) {
+            try {
+                conn.rollback();
+            } catch (SQLException ex) {
+                System.err.println("Ошибка при откате транзакции: " + ex.getMessage());
+            }
+            throw new SQLException("Не удалось вставить партию заказов", e);
         }
     }
 }

@@ -1,14 +1,14 @@
 CREATE TABLE customers
 (
     customer_id SERIAL PRIMARY KEY,
-    name        TEXT NOT NULL,
-    email       TEXT
+    name        VARCHAR NOT NULL,
+    email       VARCHAR
 );
 
 CREATE TABLE products
 (
     product_id SERIAL PRIMARY KEY,
-    name       TEXT           NOT NULL,
+    name       VARCHAR NOT NULL,
     price      NUMERIC(10, 2) NOT NULL
 );
 
@@ -23,6 +23,10 @@ CREATE TABLE orders
     status      TEXT,
     PRIMARY KEY (order_id, created_at)
 ) PARTITION BY RANGE (created_at);
+
+ALTER TABLE orders
+    ADD CONSTRAINT chk_order_status
+        CHECK (status IN ('NEW', 'PROCESSING', 'COMPLETED', 'CANCELLED'));
 
 CREATE TABLE orders_2024 PARTITION OF orders
     FOR VALUES FROM ('2024-01-01 00:00:00') TO ('2025-01-01 00:00:00');
